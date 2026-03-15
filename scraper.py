@@ -24,7 +24,7 @@ ACCOUNTS = [
 ]
 
 MAX_ITEMS = 100
-HOURS_LOOKBACK = 24
+HOURS_LOOKBACK = 36
 
 # Secrets GitHub
 APIFY_TOKEN  = os.environ.get("APIFY_TOKEN", "")
