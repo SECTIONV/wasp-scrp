@@ -13,9 +13,30 @@ from datetime import datetime, timezone, timedelta
 # COMPTES À SURVEILLER — modifiez cette liste
 # ─────────────────────────────────────────
 ACCOUNTS = [
-    # Ajoutez vos comptes sans le @
-    # "SahelWatch",
-    # "AfricaIntel",
+"EliasuAlhaji",
+"secmxx",
+"DanKatsina50",
+"TracTerrorism",
+"KargnHasret",
+"ighazer",
+"fabsenbln",
+"TchadOne",
+"aboub_Assikabar",
+"BrantPhilip_",
+"abousaib",
+"EyeonMali",
+"Youss2Bouna",
+"HumanityPurpose",
+"Intelligency225",
+"SahelLeaks",
+"ZagazOlaMakama",
+"MedLilly1",
+"hamid_gade",
+"AgAnchawadje",
+"mintelworld",
+"malkoomx00",
+"michombero",
+"Malijetactu",
 ]
 
 MAX_TWEETS_PER_ACCOUNT = 10
