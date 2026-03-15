@@ -10,45 +10,16 @@ import sys
 from datetime import datetime, timezone, timedelta
 
 # ─────────────────────────────────────────
-# COMPTES À SURVEILLER — modifiez cette liste
+# COMPTES À SURVEILLER
 # ─────────────────────────────────────────
 ACCOUNTS = [
-"EliasuAlhaji",
-"secmxx",
-"DanKatsina50",
-"TracTerrorism",
-"KargnHasret",
-"ighazer",
-"fabsenbln",
-"TchadOne",
-"aboub_Assikabar",
-"BrantPhilip_",
-"abousaib",
-"EyeonMali",
-"Youss2Bouna",
-"HumanityPurpose",
-"Intelligency225",
-"SahelLeaks",
-"ZagazOlaMakama",
-"MedLilly1",
-"hamid_gade",
-"AgAnchawadje",
-"mintelworld",
-"malkoomx00",
-"michombero",
-"Malijetactu",
+    # Ajoutez vos comptes sans le @
+    # "SahelWatch",
 ]
 
 MAX_TWEETS_PER_ACCOUNT = 10
 HOURS_LOOKBACK = 24
 
-# ─────────────────────────────────────────
-# CREDENTIALS DU COMPTE X SECONDAIRE
-# Stockés dans les GitHub Secrets :
-#   X_USERNAME  → votre pseudo X
-#   X_PASSWORD  → votre mot de passe
-#   X_EMAIL     → votre email X
-# ─────────────────────────────────────────
 X_USERNAME = os.environ.get("X_USERNAME", "")
 X_PASSWORD = os.environ.get("X_PASSWORD", "")
 X_EMAIL    = os.environ.get("X_EMAIL", "")
@@ -63,13 +34,29 @@ async def main():
         print("ERREUR : Variables X_USERNAME / X_PASSWORD / X_EMAIL manquantes")
         sys.exit(1)
 
-    from twscrape import API, gather
+    from twscrape import API
     from twscrape.logger import set_log_level
-    set_log_level("ERROR")
+    set_log_level("INFO")  # Verbose pour debug
 
     api = API()
+
+    # Ajout du compte
+    print(f"Ajout du compte @{X_USERNAME}...")
     await api.pool.add_account(X_USERNAME, X_PASSWORD, X_EMAIL, X_PASSWORD)
+
+    # Login
+    print("Tentative de login...")
     await api.pool.login_all()
+
+    # Vérifier le statut du compte
+    accounts = await api.pool.get_all()
+    for acc in accounts:
+        print(f"Compte : {acc.username} | actif={acc.active} | erreur={acc.error_msg}")
+
+    active = [a for a in accounts if a.active]
+    if not active:
+        print("ERREUR : Aucun compte actif — vérifiez les credentials")
+        sys.exit(1)
 
     since_dt = datetime.now(timezone.utc) - timedelta(hours=HOURS_LOOKBACK)
     all_tweets = []
@@ -125,7 +112,6 @@ async def main():
         except Exception as e:
             print(f"  Erreur @{username} : {e}")
 
-    # Trier par date décroissante
     all_tweets.sort(key=lambda x: x["date_in"] + x["time"], reverse=True)
     for i, t in enumerate(all_tweets):
         t["id"] = i
