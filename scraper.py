@@ -44,7 +44,7 @@ ACCOUNTS = [
 MAX_TWEETS_PER_ACCOUNT = 20
 
 # Ne garder que les tweets des dernières N heures
-HOURS_LOOKBACK = 24
+HOURS_LOOKBACK = 36
 
 # ─────────────────────────────────────────
 
