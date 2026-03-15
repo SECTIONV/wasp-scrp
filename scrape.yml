@@ -3,7 +3,7 @@ name: OSINT X Scraper
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # 14h heure d'été Paris (UTC+2)
+    - cron: '0 12 * * *'
   workflow_dispatch:
 
 env:
@@ -12,7 +12,6 @@ env:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
