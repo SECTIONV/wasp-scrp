@@ -38,9 +38,10 @@ ACCOUNTS = [
 "malkoomx00",
 "michombero",
 "Malijetactu",
+]
 
 # Nombre de tweets max par compte
-MAX_TWEETS_PER_ACCOUNT = 10
+MAX_TWEETS_PER_ACCOUNT = 20
 
 # Ne garder que les tweets des dernières N heures
 HOURS_LOOKBACK = 24
