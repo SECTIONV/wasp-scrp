@@ -1,0 +1,37 @@
+name: OSINT X Scraper
+
+on:
+  schedule:
+    - cron: '0 12 * * *'  # 14h heure d'été Paris (UTC+2)
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install twscrape
+
+      - name: Run scraper
+        env:
+          X_USERNAME: ${{ secrets.X_USERNAME }}
+          X_PASSWORD: ${{ secrets.X_PASSWORD }}
+          X_EMAIL: ${{ secrets.X_EMAIL }}
+        run: python scraper.py
+
+      - name: Commit tweets.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add tweets.json
+          git diff --staged --quiet || git commit -m "Update tweets.json $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
