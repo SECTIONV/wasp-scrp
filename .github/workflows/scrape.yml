@@ -2,9 +2,7 @@ name: OSINT X Scraper
 
 on:
   schedule:
-    # Lance tous les jours à 12h00 UTC (14h heure d'été Paris UTC+2)
-    - cron: '0 12 * * *'
-  # Permet aussi de lancer manuellement depuis l'onglet Actions
+    - cron: '0 12 * * *'  # 14h heure d'été Paris (UTC+2)
   workflow_dispatch:
 
 jobs:
@@ -20,10 +18,17 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install dependencies
+        run: pip install twscrape
+
       - name: Run scraper
+        env:
+          X_USERNAME: ${{ secrets.X_USERNAME }}
+          X_PASSWORD: ${{ secrets.X_PASSWORD }}
+          X_EMAIL: ${{ secrets.X_EMAIL }}
         run: python scraper.py
 
-      - name: Commit et push tweets.json
+      - name: Commit tweets.json
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
