@@ -22,7 +22,7 @@ ACCOUNTS = [
     "mintelworld", "malkoomx00", "michombero", "Malijetactu"
 ]
 
-MAX_ITEMS    = 100
+MAX_ITEMS    = 300
 HOURS_LOOKBACK = 36
 ACTOR_ID     = "kaitoeasyapi~twitter-x-data-tweet-scraper-pay-per-result-cheapest"
 
