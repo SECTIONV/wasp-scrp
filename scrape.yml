@@ -5,6 +5,9 @@ on:
     - cron: '0 12 * * *'  # 14h heure d'été Paris (UTC+2)
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -18,14 +21,9 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install twscrape
-
       - name: Run scraper
         env:
-          X_USERNAME: ${{ secrets.X_USERNAME }}
-          X_PASSWORD: ${{ secrets.X_PASSWORD }}
-          X_EMAIL: ${{ secrets.X_EMAIL }}
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: python scraper.py
 
       - name: Commit tweets.json
