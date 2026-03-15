@@ -1,155 +1,147 @@
 """
 OSINT X Scraper — GitHub Actions
-Utilise twscrape (authentification compte X)
+Utilise Apify kaitoeasyapi via API
 """
 
-import asyncio
 import json
 import os
 import sys
+import time
+import urllib.request
+import urllib.error
 from datetime import datetime, timezone, timedelta
 
 # ─────────────────────────────────────────
 # COMPTES À SURVEILLER
 # ─────────────────────────────────────────
 ACCOUNTS = [
-"EliasuAlhaji",
-"secmxx",
-"DanKatsina50",
-"TracTerrorism",
-"KargnHasret",
-"ighazer",
-"fabsenbln",
-"TchadOne",
-"aboub_Assikabar",
-"BrantPhilip_",
-"abousaib",
-"EyeonMali",
-"Youss2Bouna",
-"HumanityPurpose",
-"Intelligency225",
-"SahelLeaks",
-"ZagazOlaMakama",
-"MedLilly1",
-"hamid_gade",
-"AgAnchawadje",
-"mintelworld",
-"malkoomx00",
-"michombero",
-"Malijetactu",
+    "EliasuAlhaji", "secmxx", "DanKatsina50", "TracTerrorism",
+    "KargnHasret", "ighazer", "fabsenbln", "TchadOne",
+    "aboub_Assikabar", "BrantPhilip_", "abousaib", "EyeonMali",
+    "Youss2Bouna", "HumanityPurpose", "Intelligency225", "SahelLeaks",
+    "ZagazOlaMakama", "MedLilly1", "hamid_gade", "AgAnchawadje",
+    "mintelworld", "malkoomx00", "michombero", "Malijetactu"
 ]
 
-MAX_TWEETS_PER_ACCOUNT = 10
+MAX_ITEMS = 100
 HOURS_LOOKBACK = 24
 
-X_USERNAME = os.environ.get("X_USERNAME", "")
-X_PASSWORD = os.environ.get("X_PASSWORD", "")
-X_EMAIL    = os.environ.get("X_EMAIL", "")
+# Secrets GitHub
+APIFY_TOKEN  = os.environ.get("APIFY_TOKEN", "")
+ACTOR_ID     = "kaitoeasyapi~twitter-x-data-tweet-scraper-pay-per-result-cheapest"
 
+# ─────────────────────────────────────────
 
-async def main():
-    if not ACCOUNTS:
-        print("ERREUR : Aucun compte dans ACCOUNTS")
+def apify_request(method, path, data=None):
+    url = f"https://api.apify.com/v2{path}?token={APIFY_TOKEN}"
+    body = json.dumps(data).encode() if data else None
+    headers = {"Content-Type": "application/json"} if data else {}
+    req = urllib.request.Request(url, data=body, headers=headers, method=method)
+    with urllib.request.urlopen(req) as r:
+        return json.loads(r.read())
+
+def main():
+    if not APIFY_TOKEN:
+        print("ERREUR : Variable APIFY_TOKEN manquante dans les secrets GitHub")
         sys.exit(1)
 
-    if not X_USERNAME or not X_PASSWORD or not X_EMAIL:
-        print("ERREUR : Variables X_USERNAME / X_PASSWORD / X_EMAIL manquantes")
+    # Construire la search query
+    search_query = " OR ".join(f"from:{acc}" for acc in ACCOUNTS)
+    print(f"Query : {search_query[:80]}...")
+
+    # Lancer le Run Apify
+    print("Lancement du Run Apify...")
+    run = apify_request("POST", f"/acts/{ACTOR_ID}/runs", {
+        "searchTerms": [search_query],
+        "maxItems": MAX_ITEMS,
+        "queryType": "Latest"
+    })
+    run_id = run["data"]["id"]
+    print(f"Run ID : {run_id}")
+
+    # Attendre la fin du Run
+    for _ in range(60):  # max 5 minutes
+        time.sleep(5)
+        status = apify_request("GET", f"/actor-runs/{run_id}")
+        st = status["data"]["status"]
+        print(f"  Statut : {st}")
+        if st in ("SUCCEEDED", "FAILED", "ABORTED"):
+            break
+
+    if st != "SUCCEEDED":
+        print(f"ERREUR : Run terminé avec statut {st}")
         sys.exit(1)
 
-    from twscrape import API
-    from twscrape.logger import set_log_level
-    set_log_level("INFO")  # Verbose pour debug
+    # Récupérer les résultats
+    dataset_id = status["data"]["defaultDatasetId"]
+    print(f"Dataset ID : {dataset_id}")
+    items_resp = apify_request("GET", f"/datasets/{dataset_id}/items")
+    items = items_resp if isinstance(items_resp, list) else items_resp.get("items", [])
+    print(f"{len(items)} tweets récupérés")
 
-    api = API()
-
-    # Ajout du compte
-    print(f"Ajout du compte @{X_USERNAME}...")
-    await api.pool.add_account(X_USERNAME, X_PASSWORD, X_EMAIL, X_PASSWORD)
-
-    # Login
-    print("Tentative de login...")
-    await api.pool.login_all()
-
-    # Vérifier le statut du compte
-    accounts = await api.pool.get_all()
-    for acc in accounts:
-        print(f"Compte : {acc.username} | actif={acc.active} | erreur={acc.error_msg}")
-
-    active = [a for a in accounts if a.active]
-    if not active:
-        print("ERREUR : Aucun compte actif — vérifiez les credentials")
-        sys.exit(1)
-
+    # Filtrer par date
     since_dt = datetime.now(timezone.utc) - timedelta(hours=HOURS_LOOKBACK)
-    all_tweets = []
-    seen_ids = set()
+    tweets = []
+    for i, item in enumerate(items):
+        raw = item.get("full_text") or item.get("text") or item.get("tweetText") or ""
+        if not raw:
+            continue
 
-    for username in ACCOUNTS:
-        print(f"Scraping @{username}...")
+        created = item.get("createdAt") or item.get("created_at") or ""
         try:
-            user = await api.user_by_login(username)
-            if not user:
-                print(f"  Compte @{username} introuvable")
-                continue
+            tweet_dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+        except Exception:
+            tweet_dt = datetime.now(timezone.utc)
 
-            count = 0
-            async for tweet in api.user_tweets(user.id, limit=MAX_TWEETS_PER_ACCOUNT * 3):
-                if tweet.id in seen_ids:
-                    continue
-                tweet_dt = tweet.date
-                if tweet_dt.tzinfo is None:
-                    tweet_dt = tweet_dt.replace(tzinfo=timezone.utc)
-                if tweet_dt < since_dt:
-                    break
+        if tweet_dt < since_dt:
+            continue
 
-                media_url = ""
-                if tweet.media and tweet.media.photos:
-                    media_url = tweet.media.photos[0].url
+        author = ""
+        if item.get("author"):
+            author = "@" + (item["author"].get("userName") or item["author"].get("screen_name") or "")
+        elif item.get("user"):
+            author = "@" + (item["user"].get("screen_name") or "")
 
-                all_tweets.append({
-                    "id": count,
-                    "src": "X",
-                    "acc": "@" + username,
-                    "time": tweet_dt.strftime("%H:%M"),
-                    "date_in": tweet_dt.strftime("%Y-%m-%d"),
-                    "url": f"https://x.com/{username}/status/{tweet.id}",
-                    "mediaUrl": media_url,
-                    "raw": tweet.rawContent or tweet.content or "",
-                    "selected": False,
-                    "llm_done": False,
-                    "status": "pending",
-                    "desc": "",
-                    "fields": {
-                        "ctrl": "", "date": "", "pays": "", "reg": "", "ville": "",
-                        "lat": "", "lon": "", "acteur": "", "type": "", "media": "", "conf": {}
-                    }
-                })
-                seen_ids.add(tweet.id)
-                count += 1
-                if count >= MAX_TWEETS_PER_ACCOUNT:
-                    break
+        media_url = ""
+        if item.get("media") and len(item["media"]) > 0:
+            media_url = item["media"][0].get("media_url_https") or item["media"][0].get("url") or ""
 
-            print(f"  → {count} tweet(s)")
+        tweet_url = item.get("url") or item.get("tweetUrl") or "#"
 
-        except Exception as e:
-            print(f"  Erreur @{username} : {e}")
+        tweets.append({
+            "id": i,
+            "src": "X",
+            "acc": author,
+            "time": tweet_dt.strftime("%H:%M"),
+            "date_in": tweet_dt.strftime("%Y-%m-%d"),
+            "url": tweet_url,
+            "mediaUrl": media_url,
+            "raw": raw,
+            "selected": False,
+            "llm_done": False,
+            "status": "pending",
+            "desc": "",
+            "fields": {
+                "ctrl": "", "date": "", "pays": "", "reg": "", "ville": "",
+                "lat": "", "lon": "", "acteur": "", "type": "", "media": "", "conf": {}
+            }
+        })
 
-    all_tweets.sort(key=lambda x: x["date_in"] + x["time"], reverse=True)
-    for i, t in enumerate(all_tweets):
+    tweets.sort(key=lambda x: x["date_in"] + x["time"], reverse=True)
+    for i, t in enumerate(tweets):
         t["id"] = i
 
     output = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "accounts": ACCOUNTS,
-        "total": len(all_tweets),
-        "tweets": all_tweets
+        "total": len(tweets),
+        "tweets": tweets
     }
 
     with open("tweets.json", "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
 
-    print(f"\n✓ {len(all_tweets)} tweets écrits dans tweets.json")
-
+    print(f"\n✓ {len(tweets)} tweets écrits dans tweets.json")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
